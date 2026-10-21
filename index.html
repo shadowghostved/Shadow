@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shadow - Premium Chat</title>
+    <meta name="theme-color" content="#050505">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="manifest" href='data:application/manifest+json,{"name":"Shadow","short_name":"Shadow","start_url":"./","display":"standalone","background_color":"#050505","theme_color":"#050505","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/2950/2950657.png","sizes":"512x512","type":"image/png"}]}'>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        body { background-color: #050505; color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+        .page { display: none; width: 100%; max-width: 650px; }
+        .page.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+        .login-box { background: #111; border: 1px solid #333; border-radius: 20px; padding: 40px; text-align: center; max-width: 400px; margin: auto; }
+        .login-box input { width: 100%; padding: 15px; margin: 20px 0; background: #000; border: 1px solid #333; color: #fff; border-radius: 10px; font-size: 16px; outline: none; }
+        .btn { width: 100%; padding: 15px; border-radius: 10px; border: none; background: #fff; color: #000; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn:hover { background: #ddd; }
+        .error-msg { color: #ff4d4d; background: #ff4d4d22; border: 1px solid #ff4d4d; padding: 10px; border-radius: 8px; font-size: 14px; margin-top: 15px; display: none; }
+        .home-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .card { background: #111; border: 1px solid #333; padding: 20px; border-radius: 15px; cursor: pointer; transition: 0.2s; }
+        .card:hover { border-color: #fff; }
+        .card.full { grid-column: span 2; }
+        #groupList { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+        .group-pill { background: #222; padding: 8px 15px; border-radius: 20px; font-size: 14px; cursor: pointer; border: 1px solid #444; display: flex; align-items: center; gap: 8px; }
+        .group-pill:hover { background: #333; }
+        .group-img { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; }
+        .form-box { background: #111; border: 1px solid #333; border-radius: 20px; padding: 30px; }
+        .form-box input { width: 100%; padding: 15px; margin-bottom: 15px; background: #000; border: 1px solid #333; color: #fff; border-radius: 10px; outline: none; }
+        .wa-chat-container { background: #0b141a; border-radius: 15px; height: 85vh; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #333; background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); background-size: 400px; background-blend-mode: overlay; }
+        .wa-header { background: #202c33; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; }
+        .wa-header-left { display: flex; align-items: center; gap: 12px; }
+        .wa-avatar { width: 40px; height: 40px; border-radius: 50%; background: #ef4444; display: flex; justify-content: center; align-items: center; font-size: 20px; overflow: hidden; }
+        .wa-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .wa-header-info h3 { font-size: 16px; }
+        .wa-header-info p { font-size: 12px; color: #8696a0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+        .wa-header-right { color: #aebac1; font-size: 24px; cursor: pointer; padding: 0 5px; }
+        .wa-chat-box { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .wa-msg { max-width: 80%; padding: 8px 10px; border-radius: 8px; font-size: 14px; position: relative; overflow-wrap: anywhere; }
+        .wa-msg.received { align-self: flex-start; background: #202c33; border-top-left-radius: 0; }
+        .wa-msg.sent { align-self: flex-end; background: #005c4b; border-top-right-radius: 0; }
+        .wa-sender { font-size: 12px; font-weight: bold; color: #53bdeb; margin-bottom: 4px; }
+        .wa-time { font-size: 10px; color: #8696a0; text-align: right; margin-top: 4px; }
+        .wa-media { max-width: 100%; border-radius: 6px; margin-bottom: 5px; max-height: 200px; }
+        .wa-input-area { display: flex; align-items: flex-end; padding: 8px 10px; background: #0b141a; gap: 8px; }
+        .wa-input-box { flex: 1; display: flex; align-items: center; background: #2a3942; border-radius: 20px; padding: 5px 15px; min-height: 45px; min-width: 0; }
+        .wa-input-box input { width: 100%; flex: 1; background: transparent; border: none; color: #fff; font-size: 15px; outline: none; min-width: 0; }
+        .wa-btn { width: 45px; height: 45px; border-radius: 50%; border: none; background: #00a884; color: #fff; font-size: 18px; cursor: pointer; display: flex; justify-content: center; align-items: center; flex-shrink: 0; }
+        .wa-btn.recording { background: #ef4444; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; z-index: 100; }
+        .modal-box { background: #111; padding: 20px; border-radius: 15px; width: 90%; max-width: 400px; border: 1px solid #333; max-height: 90vh; overflow-y: auto; }
+        .dev-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+        .dev-table th, .dev-table td { padding: 8px; border-bottom: 1px solid #333; text-align: left; overflow-wrap: anywhere; }
+        .member-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #333; font-size: 14px; }
+        .emoji-selector { display: flex; gap: 10px; justify-content: center; margin: 15px 0; font-size: 24px; cursor: pointer; align-items: center; flex-wrap: wrap; }
+        .emoji-selector span:hover { background: #333; border-radius: 5px; }
+        @media (max-width: 480px) {
+            body { padding: 10px; }
+            .login-box, .form-box { padding: 22px; }
+            .wa-chat-container { height: 88vh; }
+            .wa-chat-box { padding: 12px; }
+            .wa-input-area { gap: 5px; padding: 7px; }
+            .wa-btn { width: 39px; height: 39px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="loginPage" class="page active">
+        <div class="login-box">
+            <h1 style="margin-bottom: 10px;">SHADOW</h1>
+            <input type="text" id="usernameInput" placeholder="Your Name" maxlength="40" autocomplete="name">
+            <div id="loginError" class="error-msg"></div>
+            <button class="btn" onclick="loginUser()">Enter Chat</button>
+        </div>
+    </div>
+
+    <div id="homePage" class="page">
+        <div class="home-grid">
+            <div class="card full" onclick="showPage('searchPage')"><h3>🔍 Search Group</h3></div>
+            <div class="card" onclick="showPage('createPage')"><h3>➕ Create</h3></div>
+            <div class="card" onclick="openDevModal()"><h3>🛠️ Developer</h3></div>
+            <div class="card full"><h3>Groups List</h3><div id="groupList">Loading...</div></div>
+        </div>
+    </div>
+
+    <div id="createPage" class="page">
+        <div class="form-box">
+            <h2 style="margin-bottom: 20px;">Create Group</h2>
+            <input type="text" id="newGroupName" placeholder="Group Name" maxlength="60">
+            <input type="password" id="newGroupPass" placeholder="Password" maxlength="100">
+            <div class="home-grid">
+                <button class="btn" style="background: #333; color: #fff;" onclick="showPage('homePage')">Back</button>
+                <button class="btn" onclick="createGroup()">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="searchPage" class="page">
+        <div class="form-box">
+            <h2 style="margin-bottom: 20px;">Search Group</h2>
+            <input type="text" id="searchName" placeholder="Enter Group Name">
+            <div id="searchError" class="error-msg">Group not found.</div>
+            <div class="home-grid">
+                <button class="btn" style="background: #333; color: #fff;" onclick="showPage('homePage')">Back</button>
+                <button class="btn" onclick="searchGroup()">Search</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="passPage" class="page">
+        <div class="form-box">
+            <h2 style="margin-bottom: 10px;">🔒 Locked</h2>
+            <p style="color: #888; margin-bottom: 20px;">Enter password for: <br><b id="passGroupName" style="color:#fff;"></b></p>
+            <input type="password" id="joinPass" placeholder="Password">
+            <div id="passError" class="error-msg">Wrong Password!</div>
+            <div class="home-grid">
+                <button class="btn" style="background: #333; color: #fff;" onclick="showPage('homePage')">Back</button>
+                <button class="btn" onclick="checkPassword()">Join</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="chatPage" class="page">
+        <div class="wa-chat-container">
+            <div class="wa-header">
+                <div class="wa-header-left">
+                    <button onclick="leaveChat()" style="background:none; border:none; color:#fff; font-size:20px; cursor:pointer;" aria-label="Back to groups">←</button>
+                    <div class="wa-avatar" id="chatRoomIcon">👥</div>
+                    <div class="wa-header-info"><h3 id="chatName">Group</h3><p id="chatMembers">Members</p></div>
+                </div>
+                <div class="wa-header-right" onclick="openCreatorAuth()" role="button" aria-label="Creator options">⋮</div>
+            </div>
+            <div class="wa-chat-box" id="chatMessages"></div>
+            <div class="wa-input-area">
+                <div class="wa-input-box"><input type="text" id="chatInput" placeholder="Message" maxlength="2000" onkeypress="if(event.key==='Enter') sendMessage()"></div>
+                <button class="wa-btn" id="micBtn" onclick="toggleVoiceRecording()" aria-label="Record voice">🎤</button>
+                <button class="wa-btn" id="vidBtn" onclick="toggleVideoRecording()" style="background:#2a3942;" aria-label="Record video">📷</button>
+                <input type="file" id="fileInput" accept="video/*" style="display: none;" onchange="handleFileUpload(event)">
+            </div>
+        </div>
+    </div>
+
+    <div id="creatorAuthModal" class="modal">
+        <div class="modal-box">
+            <h2 style="text-align: center; margin-bottom: 10px;">👑 Creator Access</h2>
+            <input type="password" id="creatorPassInput" placeholder="Enter Password" style="width:100%; padding:10px; background:#000; border:1px solid #333; color:#fff; margin-top:10px;">
+            <div id="creatorAuthError" class="error-msg">Wrong Password!</div>
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <button class="btn" style="background:#333; color:#fff;" onclick="document.getElementById('creatorAuthModal').style.display='none'">Cancel</button>
+                <button class="btn" onclick="verifyCreatorPassword()">Verify</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="creatorPanelModal" class="modal">
+        <div class="modal-box">
+            <h2 style="text-align: center; margin-bottom: 10px;">👑 Creator Panel</h2>
+            <p style="font-size: 12px; color: #888; margin-bottom: 5px;">Change Icon (Emoji or Photo)</p>
+            <div class="emoji-selector">
+                <span onclick="changeIcon('👥')">👥</span><span onclick="changeIcon('🔥')">🔥</span><span onclick="changeIcon('🚀')">🚀</span><span onclick="changeIcon('👑')">👑</span>
+                <label style="cursor:pointer; font-size:16px; background:#333; padding:5px 10px; border-radius:10px;">📁 Upload <input type="file" accept="image/*" style="display:none;" onchange="uploadGroupIcon(event)"></label>
+            </div>
+            <p style="font-size: 12px; color: #888; margin-bottom: 5px; margin-top:15px;">Manage Members</p>
+            <div id="creatorMembersList" style="max-height: 150px; overflow-y: auto;"></div>
+            <button class="btn" style="margin-top: 20px;" onclick="document.getElementById('creatorPanelModal').style.display='none'">Close</button>
+        </div>
+    </div>
+
+    <div id="devModal" class="modal">
+        <div class="modal-box">
+            <h2 style="color: red; margin-bottom: 15px;">Developer Access</h2>
+            <input type="password" id="devPass" placeholder="Password" style="width:100%; padding:10px; background:#000; border:1px solid #333; color:#fff;">
+            <div id="devError" class="error-msg">Wrong Password</div>
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <button class="btn" style="background:#333; color:#fff;" onclick="document.getElementById('devModal').style.display='none'">Cancel</button>
+                <button class="btn" style="background:red; color:#fff;" onclick="checkDevPass()">Enter</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="devPanel" class="page">
+        <div class="form-box">
+            <h2 style="color: red; margin-bottom: 15px;">Dev Panel</h2>
+            <table class="dev-table"><thead><tr><th>Group</th><th>Pass</th><th>Action</th></tr></thead><tbody id="devTableBody"></tbody></table>
+            <button class="btn" style="margin-top: 20px;" onclick="showPage('homePage')">Back</button>
+        </div>
+    </div>
+
+    <script>
+        // Supabase public/publishable keys are intended for browser use only when database RLS policies are configured correctly.
+        const SUPABASE_URL = 'https://aaqvheadyajpiavjfsxy.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_bSnSRcjy6TjCxyhZL3Uk3Q_BvwY-JeS';
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let currentUser = "", currentGroups = [], targetGroup = null, chatChannel = null;
+        let mediaRecorder, recordedChunks = [], isRecording = false, recordingType = null, mediaStream = null;
+        // IMPORTANT: This client-side password is visible to anyone inspecting the website source.
+        const DEV_PASSWORD = "@Shadowsiddved";
+
+        async function loginUser() {
+            const name = document.getElementById('usernameInput').value.trim();
+            const errorBox = document.getElementById('loginError');
+            if (!name) { errorBox.textContent = "Enter name."; errorBox.style.display = 'block'; return; }
+            errorBox.style.display = 'block'; errorBox.style.color = '#fff'; errorBox.textContent = "Connecting...";
+            try {
+                const { data, error } = await supabaseClient.from('groups').select('*');
+                if (error) throw error;
+                currentUser = name; currentGroups = data || [];
+                errorBox.style.display = 'none'; updateHomePage(); showPage('homePage');
+            } catch (err) { errorBox.style.color = '#ff4d4d'; errorBox.textContent = "Error: " + err.message; }
+        }
+
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+            if (pageId === 'devPanel') renderDevTable();
+        }
+
+        function renderGroupIcon(iconData) {
+            if (iconData && iconData.startsWith('http')) return `<img src="${escapeHtml(iconData)}" class="group-img" alt="icon">`;
+            return `<span>${escapeHtml(iconData || '👥')}</span>`;
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+        }
+
+        function updateHomePage() {
+            const list = document.getElementById('groupList'); list.innerHTML = '';
+            const approved = currentGroups.filter(g => g.approved);
+            if (approved.length === 0) { list.textContent = 'No groups approved.'; return; }
+            approved.forEach(g => {
+                const span = document.createElement('span'); span.className = 'group-pill';
+                span.innerHTML = `${renderGroupIcon(g.icon)} ${escapeHtml(g.name)}`;
+                span.onclick = () => askPassword(g); list.appendChild(span);
+            });
+        }
+
+        async function createGroup() {
+            const name = document.getElementById('newGroupName').value.trim();
+            const pass = document.getElementById('newGroupPass').value.trim();
+            if (!name || !pass) return alert("Fill all fields!");
+            try {
+                const { data: existing, error: lookupError } = await supabaseClient.from('groups').select('name').eq('name', name);
+                if (lookupError) throw lookupError;
+                if (existing && existing.length > 0) {
+                    if (confirm(`Group "${name}" exists. Overwrite?`)) {
+                        const { error: membersError } = await supabaseClient.from('members').delete().eq('group_name', name);
+                        if (membersError) throw membersError;
+                        const { error: messagesError } = await supabaseClient.from('messages').delete().eq('group_name', name);
+                        if (messagesError) throw messagesError;
+                        const { error: groupError } = await supabaseClient.from('groups').delete().eq('name', name);
+                        if (groupError) throw groupError;
+                    } else return;
+                }
+                const { error: insertGroupError } = await supabaseClient.from('groups').insert([{ name, password: pass, approved: false, icon: '👥' }]);
+                if (insertGroupError) throw insertGroupError;
+                const { error: memberError } = await supabaseClient.from('members').insert([{ group_name: name, username: currentUser }]);
+                if (memberError) throw memberError;
+                alert("Created! Wait for Developer approval.");
+                const { data, error } = await supabaseClient.from('groups').select('*');
+                if (error) throw error;
+                currentGroups = data || []; updateHomePage(); showPage('homePage');
+            } catch (err) { alert("Error: " + err.message); }
+        }
+
+        function searchGroup() {
+            const query = document.getElementById('searchName').value.trim().toLowerCase();
+            const errBox = document.getElementById('searchError');
+            if (!query) { errBox.textContent = 'Enter a group name.'; errBox.style.display = 'block'; return; }
+            const found = currentGroups.find(g => g.name.toLowerCase() === query && g.approved);
+            if (found) { document.getElementById('searchName').value = ''; errBox.style.display = 'none'; askPassword(found); }
+            else { errBox.textContent = 'Group not found.'; errBox.style.display = 'block'; }
+        }
+
+        function askPassword(group) {
+            targetGroup = group; document.getElementById('passGroupName').textContent = group.name;
+            document.getElementById('joinPass').value = ''; document.getElementById('passError').style.display = 'none'; showPage('passPage');
+        }
+
+        async function checkPassword() {
+            if (!targetGroup) return;
+            if (document.getElementById('joinPass').value !== targetGroup.password) { document.getElementById('passError').style.display = 'block'; return; }
+            try {
+                const { data, error } = await supabaseClient.from('members').select('*').eq('group_name', targetGroup.name).eq('username', currentUser);
+                if (error) throw error;
+                if (!data || data.length === 0) {
+                    const { error: insertError } = await supabaseClient.from('members').insert([{ group_name: targetGroup.name, username: currentUser }]);
+                    if (insertError) throw insertError;
+                }
+                await enterChat(targetGroup.name);
+            } catch (err) { alert("Error: " + err.message); }
+        }
+
+        async function enterChat(groupName) {
+            const group = currentGroups.find(g => g.name === groupName) || targetGroup;
+            if (!group) return;
+            targetGroup = group;
+            document.getElementById('chatName').textContent = groupName;
+            document.getElementById('chatRoomIcon').innerHTML = renderGroupIcon(group.icon);
+            showPage('chatPage');
+            const container = document.getElementById('chatMessages'); container.innerHTML = 'Loading...';
+            try {
+                const { data: members, error: memberError } = await supabaseClient.from('members').select('username').eq('group_name', groupName);
+                if (memberError) throw memberError;
+                document.getElementById('chatMembers').textContent = (members || []).map(m => m.username).join(', ') || 'No members';
+                const { data: msgs, error: msgError } = await supabaseClient.from('messages').select('*').eq('group_name', groupName).order('created_at', { ascending: true });
+                if (msgError) throw msgError;
+                container.innerHTML = ''; (msgs || []).forEach(m => appendMessage(m));
+            } catch (err) { container.textContent = 'Could not load chat: ' + err.message; }
+            if (chatChannel) await supabaseClient.removeChannel(chatChannel);
+            chatChannel = supabaseClient.channel('chat-' + groupName)
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `group_name=eq.${groupName}` }, payload => appendMessage(payload.new))
+                .subscribe();
+        }
+
+        function appendMessage(msg) {
+            const container = document.getElementById('chatMessages');
+            if (!document.getElementById('chatPage').classList.contains('active')) return;
+            const div = document.createElement('div'); div.className = `wa-msg ${msg.sender === currentUser ? 'sent' : 'received'}`;
+            if (msg.type === 'text') {
+                if (msg.sender !== currentUser) {
+                    const sender = document.createElement('div'); sender.className = 'wa-sender'; sender.textContent = msg.sender || 'Unknown'; div.appendChild(sender);
+                }
+                const text = document.createElement('div'); text.textContent = msg.content || ''; div.appendChild(text);
+            } else if (msg.type === 'audio' || msg.type === 'video') {
+                const media = document.createElement(msg.type);
+                media.className = 'wa-media'; media.controls = true; media.src = msg.content;
+                if (msg.type === 'video') media.playsInline = true;
+                div.appendChild(media);
+            } else {
+                const fallback = document.createElement('div'); fallback.textContent = 'Unsupported message type'; div.appendChild(fallback);
+            }
+            const time = document.createElement('div'); time.className = 'wa-time';
+            time.textContent = `${msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : ''} ${msg.sender === currentUser ? '✓✓' : ''}`;
+            div.appendChild(time); container.appendChild(div); container.scrollTop = container.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chatInput'); const text = input.value.trim();
+            if (!text || !targetGroup) return;
+            input.value = '';
+            const { error } = await supabaseClient.from('messages').insert([{ group_name: targetGroup.name, sender: currentUser, content: text, type: 'text' }]);
+            if (error) { input.value = text; alert('Message could not be sent: ' + error.message); }
+        }
+
+        async function leaveChat() {
+            if (chatChannel) { await supabaseClient.removeChannel(chatChannel); chatChannel = null; }
+            targetGroup = null; showPage('homePage');
+        }
+
+        async function toggleVoiceRecording() {
+            if (isRecording && recordingType === 'audio') stopRecording();
+            else if (!isRecording) await startRecording('audio');
+            else alert('Stop the current recording first.');
+        }
+        async function toggleVideoRecording() {
+            if (isRecording && recordingType === 'video') stopRecording();
+            else if (!isRecording) await startRecording('video');
+            else alert('Stop the current recording first.');
+        }
+
+        async function startRecording(type) {
+            if (!targetGroup) return;
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+                if (type === 'video') document.getElementById('fileInput').click();
+                else alert('Voice recording is not supported in this browser. Try a modern browser over HTTPS.');
+                return;
+            }
+            try {
+                const constraints = type === 'audio' ? { audio: true } : { audio: true, video: true };
+                mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+                const mimeType = type === 'audio'
+                    ? (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '')
+                    : (MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus') ? 'video/webm;codecs=vp8,opus' : '');
+                mediaRecorder = new MediaRecorder(mediaStream, mimeType ? { mimeType } : undefined);
+                recordedChunks = []; recordingType = type; isRecording = true;
+                mediaRecorder.ondataavailable = event => { if (event.data.size > 0) recordedChunks.push(event.data); };
+                mediaRecorder.onerror = event => alert('Recording error: ' + (event.error?.message || 'Unknown error'));
+                mediaRecorder.onstop = async () => {
+                    const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || (type === 'audio' ? 'audio/webm' : 'video/webm') });
+                    mediaStream?.getTracks().forEach(track => track.stop()); mediaStream = null;
+                    if (!blob.size) return;
+                    // Data URLs stored in database can quickly exceed database limits; use Supabase Storage for production.
+                    if (blob.size > 2 * 1024 * 1024) { alert('This recording is over 2 MB. For reliability, upload media through Supabase Storage instead of storing it directly in a database row.'); return; }
+                    const reader = new FileReader();
+                    reader.onloadend = async () => {
+                        const { error } = await supabaseClient.from('messages').insert([{ group_name: targetGroup?.name, sender: currentUser, content: reader.result, type }]);
+                        if (error) alert('Could not send recording: ' + error.message);
+                    };
+                    reader.readAsDataURL(blob);
+                };
+                mediaRecorder.start();
+                if (type === 'audio') { document.getElementById('micBtn').classList.add('recording'); document.getElementById('micBtn').innerHTML = '⏹'; }
+                else { document.getElementById('vidBtn').classList.add('recording'); document.getElementById('vidBtn').innerHTML = '⏹'; }
+                document.getElementById('chatInput').disabled = true;
+            } catch (err) {
+                mediaStream?.getTracks().forEach(track => track.stop()); mediaStream = null;
+                if (type === 'video') document.getElementById('fileInput').click();
+                else alert('Microphone access failed: ' + err.message);
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+            isRecording = false;
+            document.getElementById('micBtn').classList.remove('recording'); document.getElementById('micBtn').innerHTML = '🎤';
+            document.getElementById('vidBtn').classList.remove('recording'); document.getElementById('vidBtn').innerHTML = '📷';
+            document.getElementById('chatInput').disabled = false;
+        }
+
+        async function handleFileUpload(event) {
+            const file = event.target.files[0]; event.target.value = '';
+            if (!file || !targetGroup) return;
+            if (!file.type.startsWith('video/')) return alert('Please select a video file.');
+            if (file.size > 2 * 1024 * 1024) return alert('Video is over 2 MB. Configure Supabase Storage for larger uploads.');
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                const { error } = await supabaseClient.from('messages').insert([{ group_name: targetGroup.name, sender: currentUser, content: reader.result, type: 'video' }]);
+                if (error) alert('Video upload failed: ' + error.message);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function openCreatorAuth() {
+            if (!targetGroup) return;
+            document.getElementById('creatorPassInput').value = '';
+            document.getElementById('creatorAuthError').style.display = 'none';
+            document.getElementById('creatorAuthModal').style.display = 'flex';
+        }
+
+        function verifyCreatorPassword() {
+            if (!targetGroup || !targetGroup.password) return;
+            const input = document.getElementById('creatorPassInput').value;
+            const reversePassword = targetGroup.password.split('').reverse().join('');
+            if (input === reversePassword) {
+                document.getElementById('creatorAuthModal').style.display = 'none';
+                document.getElementById('creatorPanelModal').style.display = 'flex'; loadCreatorMembers();
+            } else document.getElementById('creatorAuthError').style.display = 'block';
+        }
+
+        async function loadCreatorMembers() {
+            const list = document.getElementById('creatorMembersList'); list.innerHTML = 'Loading...';
+            const { data: members, error } = await supabaseClient.from('members').select('*').eq('group_name', targetGroup.name);
+            if (error) { list.textContent = 'Could not load members: ' + error.message; return; }
+            list.innerHTML = '';
+            (members || []).forEach(m => {
+                const div = document.createElement('div'); div.className = 'member-item';
+                const name = document.createElement('span'); name.textContent = m.username; div.appendChild(name);
+                if (m.username !== currentUser) {
+                    const button = document.createElement('button'); button.textContent = 'Remove';
+                    button.style.cssText = 'color:red;background:none;border:none;cursor:pointer;';
+                    button.onclick = () => removeMember(m.username); div.appendChild(button);
+                }
+                list.appendChild(div);
+            });
+        }
+
+        async function changeIcon(emoji) {
+            if (!targetGroup) return;
+            const { error } = await supabaseClient.from('groups').update({ icon: emoji }).eq('name', targetGroup.name);
+            if (error) return alert('Could not update icon: ' + error.message);
+            targetGroup.icon = emoji; document.getElementById('chatRoomIcon').innerHTML = renderGroupIcon(emoji);
+            const { data } = await supabaseClient.from('groups').select('*');
+            currentGroups = data || []; updateHomePage();
+        }
+
+        async function uploadGroupIcon(event) {
+            const file = event.target.files[0]; event.target.value = '';
+            if (!file || !targetGroup) return;
+            if (!file.type.startsWith('image/')) return alert('Please select an image.');
+            try {
+                const fileExt = (file.name.split('.').pop() || 'png').replace(/[^a-z0-9]/gi, '');
+                const fileName = `${Date.now()}.${fileExt}`;
+                const { error } = await supabaseClient.storage.from('icons').upload(fileName, file, { upsert: false });
+                if (error) throw error;
+                const { data: urlData } = supabaseClient.storage.from('icons').getPublicUrl(fileName);
+                const { error: updateError } = await supabaseClient.from('groups').update({ icon: urlData.publicUrl }).eq('name', targetGroup.name);
+                if (updateError) throw updateError;
+                targetGroup.icon = urlData.publicUrl;
+                document.getElementById('chatRoomIcon').innerHTML = renderGroupIcon(targetGroup.icon);
+                const { data } = await supabaseClient.from('groups').select('*');
+                currentGroups = data || []; updateHomePage(); alert('Icon updated successfully!');
+            } catch(err) { alert("Upload failed: " + err.message + "\nCheck that a Public Storage bucket named 'icons' exists and its policies permit this upload."); }
+        }
+
+        async function removeMember(username) {
+            if (!targetGroup || username === currentUser) return;
+            if (confirm(`Remove ${username}?`)) {
+                const { error } = await supabaseClient.from('members').delete().eq('group_name', targetGroup.name).eq('username', username);
+                if (error) alert('Could not remove member: ' + error.message);
+                else loadCreatorMembers();
+            }
+        }
+
+        function openDevModal() {
+            document.getElementById('devPass').value = '';
+            document.getElementById('devError').style.display = 'none';
+            document.getElementById('devModal').style.display = 'flex';
+        }
+        function checkDevPass() {
+            if (document.getElementById('devPass').value === DEV_PASSWORD) {
+                document.getElementById('devModal').style.display = 'none'; showPage('devPanel');
+            } else document.getElementById('devError').style.display = 'block';
+        }
+
+        function renderDevTable() {
+            const tbody = document.getElementById('devTableBody'); tbody.innerHTML = '';
+            currentGroups.forEach(g => {
+                const tr = document.createElement('tr');
+                const groupCell = document.createElement('td'); groupCell.textContent = g.name;
+                const passCell = document.createElement('td'); passCell.textContent = g.password || '(not available)';
+                const actionCell = document.createElement('td');
+                const actionBtn = document.createElement('button');
+                actionBtn.textContent = g.approved ? 'Chat' : 'Approve';
+                actionBtn.style.cssText = `background:${g.approved ? '#3b82f6' : '#4dff88'};color:${g.approved ? '#fff' : '#000'};padding:5px 8px;border:none;border-radius:5px;cursor:pointer;margin:2px;`;
+                actionBtn.onclick = () => g.approved ? devDirectAccess(g.name) : approveGroup(g.name);
+                const deleteBtn = document.createElement('button'); deleteBtn.textContent = 'Delete';
+                deleteBtn.style.cssText = 'background:#ef4444;color:#fff;padding:5px 8px;border:none;border-radius:5px;cursor:pointer;margin:2px;';
+                deleteBtn.onclick = () => deleteGroup(g.name);
+                actionCell.append(actionBtn, deleteBtn); tr.append(groupCell, passCell, actionCell); tbody.appendChild(tr);
+            });
+        }
+
+        function devDirectAccess(groupName) {
+            targetGroup = currentGroups.find(g => g.name === groupName);
+            if (targetGroup) enterChat(targetGroup.name);
+        }
+
+        async function approveGroup(name) {
+            const { error } = await supabaseClient.from('groups').update({ approved: true }).eq('name', name);
+            if (error) return alert('Could not approve group: ' + error.message);
+            const { data, error: fetchError } = await supabaseClient.from('groups').select('*');
+            if (fetchError) return alert(fetchError.message);
+            currentGroups = data || []; renderDevTable(); updateHomePage();
+        }
+
+        async function deleteGroup(name) {
+            if (!confirm(`Delete "${name}" permanently? All messages will be lost.`)) return;
+            try {
+                const { error: msgError } = await supabaseClient.from('messages').delete().eq('group_name', name);
+                if (msgError) throw msgError;
+                const { error: memberError } = await supabaseClient.from('members').delete().eq('group_name', name);
+                if (memberError) throw memberError;
+                const { error: groupError } = await supabaseClient.from('groups').delete().eq('name', name);
+                if (groupError) throw groupError;
+                const { data, error } = await supabaseClient.from('groups').select('*');
+                if (error) throw error;
+                currentGroups = data || []; renderDevTable(); updateHomePage(); alert('Deleted!');
+            } catch(err) { alert('Failed: ' + err.message); }
+        }
+    </script>
+</body>
+</html>
